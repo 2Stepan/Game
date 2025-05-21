@@ -1,0 +1,9 @@
+body {
+    background-color: blanchedalmond;
+}
+
+#canvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
