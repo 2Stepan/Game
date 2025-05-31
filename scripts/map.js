@@ -2,7 +2,7 @@
 const map = {
     width: 1920,
     height: 1080,
-    currentLevel: 1,
+    currentLevel: 3,
 
     level1: {
         bgColor: "rgb(52, 152, 219)",
@@ -220,7 +220,7 @@ const map = {
         items: [
             { x: 580, y: 150, width: 30, height: 30, type: "coin", points: 100 },
             { x: 1150, y: 900, width: 30, height: 30, type: "coin", points: 100 },
-            { x: 1650, y: 200, width: 30, height: 30, type: "coin", points: 100 },
+            { x: 1600, y: 200, width: 30, height: 30, type: "coin", points: 100 },
             { x: 10, y: 750, width: 40, height: 40, type: "diamond", points: 500, required: false  }
         ],
 

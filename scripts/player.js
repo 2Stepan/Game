@@ -20,6 +20,56 @@ class Player {
         this.lavaDamageInterval = 2000;
         this.damageFlash = 0;
         this.invulnerable = false;
+
+
+        this.sounds = {
+            jump: this.loadSound('sounds/jump.wav', 0.7),
+            coin: this.loadSound('sounds/coin.wav', 0.8),
+            diamond: this.loadSound('sounds/diamond.wav', 1.0),
+            lava: this.loadSound('sounds/lava.wav', 1, true)
+        };
+
+        this.soundCooldowns = {
+            jump: 0,
+            coin: 0,
+            lava: 0
+        };
+    }
+
+    loadSound(src, volume = 1.0, loop = false) {
+        try {
+            const audio = new Audio(src);
+            audio.volume = volume;
+            audio.loop = loop;
+            audio.preload = 'auto';
+            return audio;
+        } catch (e) {
+            console.error(`Failed to load sound ${src}:`, e);
+            return { play: () => { } };
+        }
+    }
+
+    playSound(name) {
+        if (!this.sounds[name] || Date.now() - (this.soundCooldowns[name] || 0) < 100) {
+            return;
+        }
+
+        try {
+            if (name !== 'lava') {
+                this.sounds[name].currentTime = 0;
+            }
+            this.sounds[name].play().catch(e => console.warn(`Sound ${name} error:`, e));
+            this.soundCooldowns[name] = Date.now();
+        } catch (e) {
+            console.error(`Error playing ${name}:`, e);
+        }
+    }
+
+    checkCollision(obj) {
+        return this.x + this.radius > obj.x &&
+            this.x - this.radius < obj.x + (obj.width || 0) &&
+            this.y + this.radius > obj.y &&
+            this.y - this.radius < obj.y + (obj.height || 0);
     }
 
     update(platforms) {
@@ -114,7 +164,6 @@ class Player {
             return;
         }
 
-        let surfaceY;
         if (triangle.direction === "right") {
             const relativeX = this.x - triangleLeft;
             surfaceY = triangleBottom - (relativeX / triangle.width) * triangleHeight;
@@ -174,39 +223,30 @@ class Player {
 
     checkItems() {
         const level = this.map[`level${this.map.currentLevel}`];
-        if (!level.items) return;
+        if (!level?.items) return;
 
-        let collectedCount = 0;
-        let totalRequiredItems = 0;
+        const requiredItems = level.items.filter(item => item.required !== false);
+        const collectedRequired = level.items.filter(item =>
+            item.collected && item.required !== false).length;
 
-        level.items.forEach(item => {
-            if (item.required !== false) {
-                totalRequiredItems++;
-            }
-        });
-
-        level.items.forEach(item => {
-            if (!item.collected &&
-                this.x + this.radius > item.x &&
-                this.x - this.radius < item.x + item.width &&
-                this.y + this.radius > item.y &&
-                this.y - this.radius < item.y + item.height) {
-
+        for (const item of level.items) {
+            if (!item.collected && this.checkCollision(item)) {
                 item.collected = true;
                 this.score += item.points || 100;
 
-                if (item.type === "diamond" && level.qrCode) {
-                    level.qrCode.shown = true;
+                if (item.type === "coin") {
+                    this.playSound('coin');
+                } else if (item.type === "diamond") {
+                    this.playSound('diamond');
+                    if (level.qrCode) level.qrCode.shown = true;
                 }
             }
-            if (item.required !== false && item.collected) {
-                collectedCount++;
-            }
-        });
+        }
 
-        if (collectedCount >= totalRequiredItems && totalRequiredItems > 0) {
+        if (requiredItems.length > 0 && collectedRequired >= requiredItems.length) {
             this.map.currentLevel += 1;
             this.respawn();
+            console.log(`Переход на уровень ${this.map.currentLevel}`);
         }
     }
 
@@ -214,22 +254,20 @@ class Player {
 
     checkLavaCollision() {
         this.isInLava = false;
+        const level = this.map[`level${this.map.currentLevel}`];
+        if (!level?.obstacles) return;
 
-        const currentLevel = this.map[`level${this.map.currentLevel}`];
-        if (!currentLevel.obstacles) return;
-
-        currentLevel.obstacles.forEach(obs => {
-            if (obs.type !== "lava") return;
-
-            if (this.x + this.radius > obs.x &&
-                this.x - this.radius < obs.x + obs.width &&
-                this.y + this.radius > obs.y &&
-                this.y - this.radius < obs.y + obs.height) {
-
+        for (const obs of level.obstacles) {
+            if (obs.type === "lava" && this.checkCollision(obs)) {
                 this.isInLava = true;
                 this.handleLavaDamage(obs.damage || 20);
+
+                if (this.sounds.lava.paused) {
+                    this.playSound('lava');
+                }
+                break;
             }
-        });
+        }
     }
 
     handleLavaDamage(damage) {
@@ -273,6 +311,7 @@ class Player {
     jump() {
         if (this.isGrounded) {
             this.velocityY = -this.jumpForce;
+            this.playSound('jump');
         }
     }
 
